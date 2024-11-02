@@ -66,7 +66,7 @@ app.post('/login', (req, res) => {
     if (!isMatch) return res.status(400).json({ error: 'Nom d\'utilisateur ou mot de passe incorrect' });
 
     // Générer un jeton JWT
-    const token = jwt.sign({ userId: user.id }, secret, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: user.id }, secret, { expiresIn: '48h' });
     res.json({ message: 'Connexion réussie', token });
   });
 });
@@ -94,6 +94,55 @@ app.get('/profile', authenticateToken, (req, res) => {
     });
   });
 });
+
+
+// Route de mise à jour de l'utilisateur
+app.put('/profile', authenticateToken, async (req, res) => {
+    const { nom, prenom, date_de_naissance, statut, numero_telephone, addresse_email, numero_cni_ou_passeport, photo_de_profil, date, mot_de_passe } = req.body;
+    
+    // Hash du mot de passe si modifié
+    const hashedPassword = mot_de_passe ? await bcrypt.hash(mot_de_passe, 10) : undefined;
+  
+    // Préparer les champs à mettre à jour
+    const fields = [];
+    const values = [];
+  
+    if (nom) fields.push('nom = ?'), values.push(nom);
+    if (prenom) fields.push('prenom = ?'), values.push(prenom);
+    if (date_de_naissance) fields.push('date_de_naissance = ?'), values.push(date_de_naissance);
+    if (statut) fields.push('statut = ?'), values.push(statut);
+    if (numero_telephone) fields.push('numero_telephone = ?'), values.push(numero_telephone);
+    if (addresse_email) fields.push('addresse_email = ?'), values.push(addresse_email);
+    if (numero_cni_ou_passeport) fields.push('numero_cni_ou_passeport = ?'), values.push(numero_cni_ou_passeport);
+    if (photo_de_profil) fields.push('photo_de_profil = ?'), values.push(photo_de_profil);
+    if (date) fields.push('date = ?'), values.push(date);
+    if (hashedPassword) fields.push('mot_de_passe = ?'), values.push(hashedPassword);
+    
+    values.push(req.user.userId);
+  
+    db.query(
+      `UPDATE utilisateurs SET ${fields.join(', ')} WHERE id = ?`,
+      values,
+      (err, results) => {
+        if (err) return res.status(500).json({ error: 'Erreur lors de la mise à jour de l\'utilisateur' });
+        if (results.affectedRows === 0) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+        res.json({ message: 'Utilisateur mis à jour avec succès' });
+      }
+    );
+  });
+  
+  // Route de suppression de l'utilisateur
+  app.delete('/profile', authenticateToken, (req, res) => {
+    db.query('DELETE FROM utilisateurs WHERE id = ?', [req.user.userId], (err, results) => {
+      if (err) return res.status(500).json({ error: 'Erreur lors de la suppression de l\'utilisateur' });
+      if (results.affectedRows === 0) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+      res.json({ message: 'Utilisateur supprimé avec succès' });
+    });
+  });
+
+  app.put('/profile', authenticateToken, updateUserProfile);
+app.delete('/profile', authenticateToken, deleteUserProfile);
+
 
                                           //     CRUD SUR LA TABLE MATERIEL
 
@@ -808,7 +857,7 @@ app.delete('/materiel_utilisateur/:id', deleteMaterielUtilisateur);
 
 
 
-                                            //     CRUD SUR LA TABLE FORMATION-ETUDIANT
+                                            //     CRUD SUR LA TABLE MATERIELS-ETUDIANT
 
 
 // Fonction pour créer une association entre un étudiant et un matériel
